@@ -202,7 +202,7 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 		 * @param  Charitable_Donation_Processor $processor   Donation processor object.
 		 * @return boolean|array
 		 */
-		public static function process_donation( $return, $donation_id, $processor ) {
+		public function process_donation( $return, $donation_id, $processor ) {
 			$gateway     = new Charitable_Gateway_Paystack();
 
 			$donation    = charitable_get_donation( $donation_id );
@@ -231,18 +231,11 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 			// $phone        = $donor->get_donor_meta( 'phone' );
 
 			// URL fields
-			// $return_url = charitable_get_permalink( 'donation_receipt_page', [ 'donation_id' => $donation->ID ] );
+			$return_url = charitable_get_permalink( 'donation_receipt_page', [ 'donation_id' => $donation->ID ] );
 			// $cancel_url = charitable_get_permalink( 'donation_cancel_page', [ 'donation_id' => $donation->ID ] );
 			// $notify_url = function_exists( 'charitable_get_ipn_url' )
 			// 	? charitable_get_ipn_url( Charitable_Gateway_Sparrow::ID )
 			// 	: Charitable_Donation_Processor::get_instance()->get_ipn_url( Charitable_Gateway_Sparrow::ID );
-
-			// Credit card fields
-			// $cc_expiration = $this->get_gateway_value( 'cc_expiration', $values );
-			// $cc_number     = $this->get_gateway_value( 'cc_number', $values );
-			// $cc_year       = $cc_expiration['year'];
-			// $cc_month      = $cc_expiration['month'];
-			// $cc_cvc		   = $this->get_gateway_value( 'cc_cvc', $values );
 
 			/**
 			 * Create donation charge through gateway.
