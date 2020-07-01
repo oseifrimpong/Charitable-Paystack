@@ -1,4 +1,6 @@
 <?php
+
+//comment
 /**
  * Plugin Name:       Charitable - Paystack
  * Plugin URI:
