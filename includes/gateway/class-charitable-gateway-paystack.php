@@ -210,20 +210,20 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 			$values      = $processor->get_donation_data();
 
 			// API keys
-			// $keys        = $gateway->get_keys();
-
+			$keys        = $gateway->get_keys();
+			
 			// Donation fields
 			// $donation_key = $donation->get_donation_key();
 			// $item_name    = sprintf( __( 'Donation %d', 'charitable-payu-money' ), $donation->ID );;
 			// $description  = $donation->get_campaigns_donated_to();
-			// $amount 	  = $donation->get_total_donation_amount( true );
+			$amount 	  = $donation->get_total_donation_amount( true );
 
 			// Donor fields
 			// $first_name   = $donor->get_donor_meta( 'first_name' );
 			// $last_name    = $donor->get_donor_meta( 'last_name' );
 			// $address      = $donor->get_donor_meta( 'address' );
 			// $address_2    = $donor->get_donor_meta( 'address_2' );
-			// $email 		  = $donor->get_donor_meta( 'email' );
+			$email 		  = $donor->get_donor_meta( 'email' );
 			// $city         = $donor->get_donor_meta( 'city' );
 			// $state        = $donor->get_donor_meta( 'state' );
 			// $country      = $donor->get_donor_meta( 'country' );
@@ -265,8 +265,47 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 				];
 			 *
 			 */
+			
+			$header = "Authorization: Bearer " . $keys['secret_key'];
 
-			return true;
+			$url = "https://api.paystack.co/transaction/initialize";
+  			$fields = [
+				'email' => $email,
+				'amount' => $amount,	//May require conversion of currency - multiply by 100
+				//'callback_url' => , WHAT TO MAKE THIS?
+			];
+
+			$fields_string = http_build_query($fields);
+			//open connection
+			$ch = curl_init();
+			
+			//set the url, number of POST vars, POST data
+			curl_setopt($ch,CURLOPT_URL, $url);
+			curl_setopt($ch,CURLOPT_POST, true);
+			curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
+			curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+				$header,
+				"Cache-Control: no-cache",
+			));
+			
+			//So that curl_exec returns the contents of the cURL; rather than echoing it
+			curl_setopt($ch,CURLOPT_RETURNTRANSFER, true); 
+			
+			//execute post
+			$result = curl_exec($ch);
+
+			$redirect_array = array(
+				'redirect' 	=> $result['data']['authorization_url'],
+				'safe'		=> false,
+			);
+
+			$reference = $result['data']['reference'];
+
+			$donation->set_gateway_transaction_id($reference);
+
+			curl_close($ch);
+
+			return $redirect_array['redirect'];
 		}
 
 		/**
@@ -283,6 +322,68 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 			 * @todo
 			 */
 		}
+
+		//COMPLETE - checking whether the get key matches to verify the payment
+		public static function process_response() {
+
+
+
+			if ($_GET['Authorization'] != ) {
+				return;
+			}
+			
+			$gateway     = new Charitable_Gateway_Paystack();
+
+			$reference = ; // Reference needs to be retrieved from server and stored here
+			
+			$keys = $gateway->get_keys(); 
+
+			$curl = curl_init();
+
+			curl_setopt_array($curl, array(
+				CURLOPT_URL => "https://api.paystack.co/transaction/verify/:reference",
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_ENCODING => "",
+				CURLOPT_MAXREDIRS => 10,
+				CURLOPT_TIMEOUT => 30,
+				CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+				CURLOPT_CUSTOMREQUEST => "GET",
+				CURLOPT_HTTPHEADER => array(
+				"Authorization: Bearer " . $keys['secret_key'],
+				"Cache-Control: no-cache",
+				),
+			));
+			
+			$response = curl_exec($curl);
+			$err = curl_error($curl);
+			curl_close($curl);
+			
+			$success = $response['data']['status'];
+
+			//GUESSING vvv
+			
+			$donation_id = $reference;
+
+			/* We've processed this donation already. */
+			if ( get_post_meta( $donation_id, '_charitable_processed_paystack_response', true ) ) {
+				return;
+			}
+
+			$donation = new Charitable_Donation( $donation_id );
+
+			if ($status === "success") {
+				$donation->update_donation_log( __( 'Payment completed.', 'charitable-paystack' ) );
+				$donation->update_status( 'charitable-completed' );
+			} else {
+				$donation->update_donation_log( $response['data']['message'] );
+				$donation->update_status( 'charitable-failed' );
+			}
+
+			/* Avoid processing this response again. */
+			add_post_meta( $donation_id, '_charitable_processed_paystack_response', true );
+
+		}
+
 	}
 
 endif;
