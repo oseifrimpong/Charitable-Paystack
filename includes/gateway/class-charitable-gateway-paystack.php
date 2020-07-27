@@ -27,13 +27,13 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 		const ID = 'paystack';
 
 		/**
-		 * Flags whether the gateway requires credit card fields added to the donation form.
+		 * API object.
 		 *
 		 * @since 1.0.0
 		 *
-		 * @var   boolean
+		 * @var   Charitable_Paystack_API
 		 */
-		protected $credit_card_form;
+		private $api;
 
 		/**
 		 * Instantiate the gateway class, defining its key values.
@@ -162,6 +162,27 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 		 */
 		public function get_gateway_value_from_processor( $key, Charitable_Donation_Processor $processor ) {
 			return $this->get_gateway_value( $key, $processor->get_donation_data() );
+		}
+
+		/**
+		 * Get the Paystack API object.
+		 *
+		 * @since  1.0.0
+		 *
+		 * @return Charitable_Paystack_API|false
+		 */
+		public function api() {
+			if ( ! isset( $this->api ) ) {
+				$keys = $this->get_keys();
+
+				if ( empty( $keys['secret_key'] ) ) {
+					return false;
+				}
+
+				$this->api = new Charitable_Paystack_API( $keys['secret_key'] );
+			}
+
+			return $this->api;
 		}
 
 		/**
