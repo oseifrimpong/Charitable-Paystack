@@ -326,19 +326,17 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 		//COMPLETE - checking whether the get key matches to verify the payment
 		public static function process_response() {
 
-
-
-			if ($_GET['Authorization'] != ) {
+			if ( ) {
 				return;
 			}
 			
-			$gateway     = new Charitable_Gateway_Paystack();
+			$gateway     	= new Charitable_Gateway_Paystack();
 
-			$reference = ; // Reference needs to be retrieved from server and stored here
+			$reference		= $_GET['reference']; // Reference needs to be retrieved from server and stored here
 			
-			$keys = $gateway->get_keys(); 
+			$keys 			= $gateway->get_keys(); 
 
-			$curl = curl_init();
+			$curl 			= curl_init();
 
 			curl_setopt_array($curl, array(
 				CURLOPT_URL => "https://api.paystack.co/transaction/verify/:reference",
@@ -354,11 +352,11 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 				),
 			));
 			
-			$response = curl_exec($curl);
-			$err = curl_error($curl);
+			$response 	= curl_exec($curl);
+			$err 		= curl_error($curl);
 			curl_close($curl);
 			
-			$success = $response['data']['status'];
+			$status 	= $response['data']['status'];
 
 			//GUESSING vvv
 			
@@ -375,7 +373,7 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 				$donation->update_donation_log( __( 'Payment completed.', 'charitable-paystack' ) );
 				$donation->update_status( 'charitable-completed' );
 			} else {
-				$donation->update_donation_log( $response['data']['message'] );
+				$donation->update_donation_log( $response['data']['message'] ); //Correct message to store here?
 				$donation->update_status( 'charitable-failed' );
 			}
 
