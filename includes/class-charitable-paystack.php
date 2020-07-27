@@ -178,8 +178,9 @@ if ( ! class_exists( 'Charitable_Paystack' ) ) :
 		 */
 		private function load_dependencies() {
 			require_once( $this->get_path( 'includes' ) . 'charitable-paystack-core-functions.php' );
+			require_once( $this->get_path( 'includes' ) . '/gateway/charitable-paystack-gateway-hooks.php' );
 		}
-
+		
 		/**
 		 * Load the admin-only functionality.
 		 *
