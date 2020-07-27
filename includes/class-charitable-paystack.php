@@ -178,9 +178,8 @@ if ( ! class_exists( 'Charitable_Paystack' ) ) :
 		 */
 		private function load_dependencies() {
 			require_once( $this->get_path( 'includes' ) . 'charitable-paystack-core-functions.php' );
-			require_once( $this->get_path( 'includes' ) . '/gateway/charitable-paystack-gateway-hooks.php' );
 		}
-		
+
 		/**
 		 * Load the admin-only functionality.
 		 *
@@ -234,10 +233,26 @@ if ( ! class_exists( 'Charitable_Paystack' ) ) :
 		 */
 		private function attach_hooks_and_filters() {
 			/**
-			 * Set up upgrade process.
+			 * Register our new gateway.
+			 *
+			 * @see Charitable_Gateway_Paystack::register_gateway()
 			 */
-			// add_action( 'admin_notices', [ Charitable_Paystack_Upgrade::get_instance(), 'add_upgrade_notice' ] );
-			// add_action( 'init', [ Charitable_Paystack_Upgrade::get_instance(), 'do_immediate_upgrades' ], 5 );
+			add_filter( 'charitable_payment_gateways', [ 'Charitable_Gateway_Paystack', 'register_gateway' ] );
+
+			/**
+			 * Validate the donation form submission before processing.
+			 *
+			 * @see Charitable_Gateway_Paystack::validate_donation()
+			 */
+			// add_filter( 'charitable_validate_donation_form_submission_gateway', [ 'Charitable_Gateway_Paystack', 'validate_donation' ], 10, 3 );
+
+			/**
+			 * Process the donation.
+			 *
+			 * @see Charitable_Gateway_Paystack::process_donation()
+			 */
+			add_filter( 'charitable_process_donation_paystack', [ 'Charitable_Gateway_Paystack', 'process_donation' ], 10, 3 );
+
 		}
 
 		/**
