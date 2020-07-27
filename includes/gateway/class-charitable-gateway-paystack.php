@@ -61,7 +61,7 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 			/**
 			 * Needed for backwards compatibility with Charitable < 1.3
 			 */
-			$this->credit_card_form = true;
+			$this->credit_card_form = false;
 		}
 
 		/**
@@ -211,7 +211,7 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 
 			// API keys
 			$keys        = $gateway->get_keys();
-			
+
 			// Donation fields
 			// $donation_key = $donation->get_donation_key();
 			// $item_name    = sprintf( __( 'Donation %d', 'charitable-payu-money' ), $donation->ID );;
@@ -258,7 +258,7 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 				];
 			 *
 			 */
-			
+
 			$header = "Authorization: Bearer " . $keys['secret_key'];
 
 			$url = "https://api.paystack.co/transaction/initialize";
@@ -271,7 +271,7 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 			$fields_string = http_build_query($fields);
 			//open connection
 			$ch = curl_init();
-			
+
 			//set the url, number of POST vars, POST data
 			curl_setopt($ch,CURLOPT_URL, $url);
 			curl_setopt($ch,CURLOPT_POST, true);
@@ -280,10 +280,10 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 				$header,
 				"Cache-Control: no-cache",
 			));
-			
+
 			//So that curl_exec returns the contents of the cURL; rather than echoing it
-			curl_setopt($ch,CURLOPT_RETURNTRANSFER, true); 
-			
+			curl_setopt($ch,CURLOPT_RETURNTRANSFER, true);
+
 			//execute post
 			$result = curl_exec($ch);
 
@@ -321,15 +321,15 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 
 
 
-			if ($_GET['Authorization'] != ) {
-				return;
-			}
-			
+			// if ($_GET['Authorization'] != ) {
+			// 	return;
+			// }
+
 			$gateway     = new Charitable_Gateway_Paystack();
 
-			$reference = ; // Reference needs to be retrieved from server and stored here
-			
-			$keys = $gateway->get_keys(); 
+			// $reference = ; // Reference needs to be retrieved from server and stored here
+
+			$keys = $gateway->get_keys();
 
 			$curl = curl_init();
 
@@ -346,15 +346,15 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 				"Cache-Control: no-cache",
 				),
 			));
-			
+
 			$response = curl_exec($curl);
 			$err = curl_error($curl);
 			curl_close($curl);
-			
+
 			$success = $response['data']['status'];
 
 			//GUESSING vvv
-			
+
 			$donation_id = $reference;
 
 			/* We've processed this donation already. */
