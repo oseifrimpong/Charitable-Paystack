@@ -289,11 +289,11 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 					'email'  		=> $email,
 					'amount' 		=> $amount*100,
 					'callback_url' 	=> $return_url,
-					//'cancel_url' 	=> $cancel_url, //Is there no cancel url???
+					//'cancel_url' 	=> $cancel_url, 
 					'currency' 		=> $currency,
+					
 				],
-				$timeout = 10,
-				$secretKey = $keys['secret_key']
+				$timeout = 10
 			);
 
 			//Catch failed requests
@@ -348,10 +348,10 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 				return;
 			}
 
-			$gateway     	= new Charitable_Gateway_Paystack();
+			$gateway = new Charitable_Gateway_Paystack();
 
 			//Collect the payment reference to find by donation ID
-			$reference		= $_GET['reference']; 
+			$reference = $_GET['reference']; 
 			if (is_null($reference)) {
 				return;
 			}
@@ -361,26 +361,27 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 				return;
 			}
 
-			/* Update our donation */
-			$donation = charitable_get_donation( $donation_id );
-			$donation->log()->add( 'My log message' );
-			$donation->update_status( 'charitable-completed' );
-			$keys        = $gateway->get_keys();
-
-			//Check whether the payment has gone through
-			$getResponse = $gateway->api()->get(
-				$method = 'transaction/verify/'. $reference,
-				$args = [],
-				$timeout = 10,
-				$secretKey = $keys['secret_key']
-			);
-
-			$status 	= $getResponse->status;
-
 			/* We've processed this donation already. */
 			if ( get_post_meta( $donation_id, '_charitable_processed_paystack_response', true ) ) {
 				return;
 			}
+
+			/* Update our donation */
+			$donation = charitable_get_donation( $donation_id );
+			//$donation->log()->add( 'My log message' );
+			$donation->update_status( 'charitable-completed' );
+			$keys     = $gateway->get_keys();
+
+			//Check whether the payment has gone through
+			$getResponse = $gateway->api()->get(
+				$method 	= 'transaction/verify/'. $reference,
+				$args 		= [],
+				$timeout 	= 10
+			);
+
+			error_log(var_export($getResponse, true));
+
+			$status = $getResponse->data->status;
 
 			$donation = new Charitable_Donation( $donation_id );
 
@@ -388,7 +389,7 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 				$donation->update_donation_log( __( 'Payment completed.', 'charitable-paystack' ) );
 				$donation->update_status( 'charitable-completed' );
 			} else {
-				$donation->update_donation_log( $getResponse->message ); //Correct message to store here?
+				$donation->update_donation_log( $getResponse->message );
 				$donation->update_status( 'charitable-failed' );
 			}
 
@@ -397,8 +398,109 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 
 		}
 
+		
+	/**
+		 * Check whether a particular donation can be refunded automatically in Paystack.
+		 *
+		 * @since  1.0.0
+		 *
+		 * @param  Charitable_Donation $donation The donation object.
+		 * @return boolean
+		 */
+		public function is_donation_refundable( Charitable_Donation $donation ) {
+
+			$gateway     	= new Charitable_Gateway_Paystack();
+
+			$keys 			= $gateway->get_keys();
+
+			$private_key 	= $keys['secret_key'];
+
+			if ( ! $private_key ) {
+				return false;
+			}		
+
+			return false != $donation->get_gateway_transaction_id();
+		}
+
+		//TODO vvv
+	/**
+		 * Process a refund initiated in the WordPress dashboard.
+		 *
+		 * @since  1.0.0
+		 *
+		 * @param  int $donation_id The donation ID.
+		 * @return boolean
+		 */
+		
+		
+		public function refund_donation_from_dashboard( $donation_id ) {
+			$donation = charitable_get_donation( $donation_id );
+			
+			$donation->log()->add( 'Pre donation check' );
+			if ( ! $donation ) {
+				return false;
+			}
+
+			$transaction = $donation->get_gateway_transaction_id();
+
+			$donation->log()->add( 'Pre transaction check' );
+			if ( ! $transaction ) {
+				return false;
+			}
+
+			$gateway   	= new Charitable_Gateway_Paystack();
+			$test_mode 	= $donation->get_test_mode( false );
+			$paystack 	= $gateway->get_gateway_instance( $test_mode );
+
+			try {
+
+				$result = $gateway->api()->post(
+					$method = 'refund',
+					$args 	= [
+						'transaction'  		=> $transaction,
+						//'amount' 			=> $amount*100,
+						//'currency' 		=> $currency,
+					],
+					$timeout 	= 10
+				);
+				update_post_meta( $donation_id, '_paystack_refunded', true );
+				update_post_meta( $donation_id, '_paystack_refund_id', $result->transaction->id );
+
+				//vvvv Not yet worked on
+				$refund_url = sprintf(
+					'https://%spaystackgateway.com/merchants/%s/transactions/%s',
+					$test_mode ? 'sandbox.' : '',
+					$test_mode ? $gateway->get_value( 'test_merchant_id' ) : $gateway->get_value( 'live_merchant_id' ),
+					$result->transaction->id
+				);
+
+				$donation->log()->add(
+					sprintf(
+						/* translators: %s: transaction reference. */
+						__( 'paystack refund transaction ID: %s', 'charitable-paystack' ),
+						'<a href="' . $refund_url . '" target="_blank"><code>' . $result->transaction->id . '</code></a></code>'
+					)
+				);
+
+				//refund_id?
+				//
+
+				//$donation->log()->add( 'My log message' );
+
+				return true;
+			} catch ( Exception $e ) {
+				$donation->log()->add(
+					sprintf(
+						/* translators: %s: error message. */
+						__( 'paystack refund failed: %s', 'charitable-paystack' ),
+						$e->message
+					)
+				);
+
+				return false;
+			}
+		}
+
 	}
-
-	//
-
+		
 endif;

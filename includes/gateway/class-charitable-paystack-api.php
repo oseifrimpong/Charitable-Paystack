@@ -57,8 +57,8 @@ class Charitable_Paystack_API {
 	 * @param  int     $timeout Duration before request times out.
 	 * @return mixed[]
 	 */
-	public function post( $method, $args = [], $timeout = 10, $secretKey = '' ) {
-		return $this->make_request( 'post', $method, $args, $timeout, $secretKey );
+	public function post( $method, $args = [], $timeout = 10 ) {
+		return $this->make_request( 'post', $method, $args, $timeout );
 	}
 
 	/**
@@ -86,7 +86,7 @@ class Charitable_Paystack_API {
 	 * @param  mixed[] $args     Assoc array of parameters to be passed as the body of the request.
 	 * @return false|mixed[] Assoc array of decoded result. False if there was an error.
 	 */
-	public function make_request( $http_verb, $method, $args = [], $timeout = 10, $secretKey = '') {
+	public function make_request( $http_verb, $method, $args = [], $timeout = 10) {
 		if ( ! $this->is_valid_api_key() ) {
 			return false;
 		}
@@ -105,7 +105,7 @@ class Charitable_Paystack_API {
 			'body'        => $body,
 			'headers'     => [
 				'content-type'  => 'application/json',
-				'authorization' => 'Bearer ' . $secretKey,
+				'authorization' => 'Bearer ' . $this->api_key,
 			],
 		];
 
