@@ -254,6 +254,8 @@ if ( ! class_exists( 'Charitable_Paystack' ) ) :
 			add_filter( 'charitable_process_donation_paystack', [ 'Charitable_Gateway_Paystack', 'process_donation' ], 10, 3 );
 
 			add_action( 'init', [ 'Charitable_Gateway_Paystack', 'process_response' ] );
+
+			add_action( 'charitable_process_refund_paystack', [ 'Charitable_Gateway_Paystack', 'refund_donation_from_dashboard' ] );
 		}
 
 		/**
