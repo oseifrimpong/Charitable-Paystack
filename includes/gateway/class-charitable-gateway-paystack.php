@@ -284,16 +284,14 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 			$currency 	= charitable_get_currency();
 
 			$response 	= $gateway->api()->post(
-				$method = 'transaction/initialize',
-				$args 	= [
+				'transaction/initialize',
+				[
 					'email'  		=> $email,
 					'amount' 		=> $amount*100,
 					'callback_url' 	=> $return_url,
 					//'cancel_url' 	=> $cancel_url, 
 					'currency' 		=> $currency,
-					
-				],
-				$timeout = 10
+				]
 			);
 
 			//Catch failed requests
@@ -373,9 +371,8 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 
 			//Check whether the payment has gone through
 			$getResponse = $gateway->api()->get(
-				$method 	= 'transaction/verify/'. $reference,
-				$args 		= [],
-				$timeout 	= 10
+				'transaction/verify/'. $reference,
+				[],
 			);
 
 			//error_log(var_export($getResponse, true));
@@ -448,12 +445,11 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 
 				//Request refund from Paystack
 				$result = $gateway->api()->post(
-					$method = 'refund',
-					$args 	= [
+					'refund',
+					[
 						'transaction'  		=> $transaction,
 						'merchant_note'		=> 'Refunded from Charitable dashboard',
 					],
-					$timeout 	= 10
 				);
 
 				//Ensure the refund has been approved before updating as refunded
@@ -479,7 +475,7 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 				$donation->log()->add(
 					sprintf(
 						/* translators: %s: error message. */
-						__( 'paystack refund failed: %s', 'charitable-paystack' ),
+						__( 'Paystack refund failed: %s', 'charitable-paystack' ),
 						$e->message
 					)
 				);
