@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Charitable_Paystack_API {
 
 	private $api_key;
-	private $api_endpoint = '';
+	private $api_endpoint = 'https://api.paystack.co';
 	private $valid_api_key;
 
 	/**
@@ -86,7 +86,7 @@ class Charitable_Paystack_API {
 	 * @param  mixed[] $args     Assoc array of parameters to be passed as the body of the request.
 	 * @return false|mixed[] Assoc array of decoded result. False if there was an error.
 	 */
-	public function make_request( $http_verb, $method, $args = [], $timeout = 10 ) {
+	public function make_request( $http_verb, $method, $args = [], $timeout = 10) {
 		if ( ! $this->is_valid_api_key() ) {
 			return false;
 		}
@@ -105,23 +105,24 @@ class Charitable_Paystack_API {
 			'body'        => $body,
 			'headers'     => [
 				'content-type'  => 'application/json',
-				'authorization' => '',
+				'authorization' => 'Bearer ' . $this->api_key,
 			],
 		];
 
+
 		switch ( $http_verb ) {
 			case 'GET':
-				$request = wp_remote_get( $url, $request_args );
+				$this->request = wp_remote_get( $url, $request_args );
 				break;
 			case 'POST':
-				$request = wp_remote_post( $url, $request_args );
+				$this->request = wp_remote_post( $url, $request_args );
 				break;
 			default:
-				$request = wp_remote_request( $url, $request_args );
+				$this->request = wp_remote_request( $url, $request_args );
 		}
 
 		if ( defined( 'CHARITABLE_DEBUG' ) && CHARITABLE_DEBUG ) {
-			error_log( var_export( $request, true ) );
+			error_log( var_export( $this->request, true ) );
 		}
 
 		/**
@@ -133,14 +134,20 @@ class Charitable_Paystack_API {
 		 * @see https://developers.Paystack.com/docs/response
 		 */
 		if ( ! isset( $this->valid_api_key ) ) {
-			$this->valid_api_key = $this->api_key_validated( $request );
+			$this->valid_api_key = $this->api_key_validated( $this->request );
 		}
 
-		if ( $this->is_failed_request( $request ) ) {
+		/*
+		if ( $this->is_failed_request( $this->request ) ) {
 			return false;
 		}
+		*/
 
-		return json_decode( wp_remote_retrieve_body( $request ) );
+		return json_decode( wp_remote_retrieve_body( $this->request ) );
+	}
+
+	public function get_last_result() {
+		return $this->request;
 	}
 
 	/**
@@ -180,6 +187,6 @@ class Charitable_Paystack_API {
 	 * @return boolean
 	 */
 	private function is_failed_request( $request ) {
-		return is_wp_error( $request ) || 2 != substr( wp_remote_retrieve_response_code( $request ), 0, 1 );
+		return is_wp_error( $request ) || 2 != substr( wp_remote_retrieve_response_code( $this->request ), 0, 1 );
 	}
 }
