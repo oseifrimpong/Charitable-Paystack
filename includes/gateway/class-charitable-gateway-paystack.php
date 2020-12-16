@@ -289,15 +289,15 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 					'email'  		=> $email,
 					'amount' 		=> $amount*100,
 					'callback_url' 	=> $return_url,
-					//'cancel_url' 	=> $cancel_url, 
+					//'cancel_url' 	=> $cancel_url,
 					'currency' 		=> $currency,
 				]
 			);
 
 			//Catch failed requests
 			$error = $gateway->api->get_last_result();
-			
-			if ( is_wp_error($error) ) {				
+
+			if ( is_wp_error($error) ) {
 				return false;
 			}
 
@@ -322,7 +322,7 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 			$donation->set_gateway_transaction_id($reference);
 
 			return $redirect_array;
-		
+
 		}
 
 		/**
@@ -341,7 +341,6 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 		}
 
 		public static function process_response() {
-
 			if ( ! isset( $_GET['reference'] )) {
 				return;
 			}
@@ -349,7 +348,7 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 			$gateway = new Charitable_Gateway_Paystack();
 
 			//Collect the payment reference to find by donation ID
-			$reference = $_GET['reference']; 
+			$reference = $_GET['reference'];
 			if (is_null($reference)) {
 				return;
 			}
@@ -393,7 +392,7 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 			add_post_meta( $donation_id, '_charitable_processed_paystack_response', true );
 
 		}
-		
+
 	/**
 		 * Check whether a particular donation can be refunded automatically in Paystack.
 		 *
@@ -412,7 +411,7 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 
 			if ( ! $private_key ) {
 				return false;
-			}		
+			}
 
 			return false != $donation->get_gateway_transaction_id();
 		}
@@ -425,10 +424,10 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 		 * @param  int $donation_id The donation ID.
 		 * @return boolean
 		 */
-		
-		
+
+
 		public static function refund_donation_from_dashboard( $donation_id ) {
-			
+
 			$donation = charitable_get_donation( $donation_id );
 			if ( ! $donation ) {
 				return false;
@@ -456,7 +455,7 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 				if ($result->status) {
 					update_post_meta( $donation_id, '_paystack_refunded', true );
 					$donation->log()->add('Refunded automatically from dashboard');
-				
+
 				} else {
 				//Show the error message for failed refunds in the log
 					$donation->log()->add(
@@ -485,5 +484,5 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 		}
 
 	}
-		
+
 endif;

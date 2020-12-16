@@ -2,7 +2,7 @@
 /**
  * Interpret incoming Paystack webhooks.
  *
- * @package   Charitable Paystack/Classes/\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter
+ * @package   Charitable Paystack/Classes/Charitable_Paystack_Webhook_Interpreter
  * @author    Eric Daams
  * @copyright Copyright (c) 2020, Studio 164a
  * @license   http://opensource.org/licenses/gpl-2.0.php GNU Public License
@@ -15,14 +15,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) :
+if ( ! class_exists( 'Charitable_Paystack_Webhook_Interpreter' ) ) :
 
 	/**
-	 * \Charitable\Pro\Paystack\Gateway\Webhook\Interpreter
+	 * Charitable_Paystack_Webhook_Interpreter
 	 *
 	 * @since 1.0.0
 	 */
-	class Interpreter implements \Charitable_Webhook_Interpreter_Interface, \Charitable_Webhook_Interpreter_Donations_Interface {
+	class Charitable_Paystack_Webhook_Interpreter implements Charitable_Webhook_Interpreter_Interface, Charitable_Webhook_Interpreter_Donations_Interface {
 
 		/**
 		 * Valid webhook.
@@ -130,7 +130,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return boolean
 		 */
 		public function has_processor() {
-			return true;
+			return false;
 		}
 
 		/**
@@ -141,7 +141,8 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return false|Charitable_Webhook_Processor
 		 */
 		public function get_processor() {
-			return new Processor( $this );
+			return false;
+			// return new Processor( $this );
 		}
 
 		/**
@@ -163,7 +164,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 *
 		 * @since  1.0.0
 		 *
-		 * @return \Charitable\Pro\Paystack\Gateway\Webhook\Interpreter|false
+		 * @return Charitable_Paystack_Webhook_Interpreter|false
 		 */
 		public function get_donations_interpreter() {
 			return $this;
@@ -177,6 +178,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return Charitable_Donation|false Returns the donation if one matches the webhook.
 		 */
 		public function get_donation() {
+
 			if ( ! isset( $this->donation ) ) {
 				/* The donation ID needs to match a donation post type. */
 				if ( \Charitable::DONATION_POST_TYPE !== get_post_type( $this->donation_id ) ) {
@@ -185,8 +187,8 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 
 				$this->donation = charitable_get_donation( $this->donation_id );
 
-				if ( 'Paystack' !== $this->donation->get_gateway() ) {
-					$this->set_invalid_request( __( 'Incorrect gateway', 'charitable-Paystack' ) );
+				if ( 'paystack' !== $this->donation->get_gateway() ) {
+					$this->set_invalid_request( __( 'Incorrect gateway', 'charitable-paystack' ) );
 					$this->donation = false;
 				}
 			}
@@ -202,13 +204,14 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return string
 		 */
 		public function get_event_type() {
+
 			/* Payment has been fully refunded. */
 			if ( $this->get_refund_amount() ) {
 				return 'refund';
 			}
 
 			switch ( $this->data->status ) {
-				
+
 				case 'failed':
 					return 'failed_payment';
 
@@ -258,6 +261,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return string|false The gateway transaction ID if available, otherwise false.
 		 */
 		public function get_gateway_transaction_id() {
+
 			if ( ! isset($this->data->reference) ) {
 				return false;
 			}
@@ -278,12 +282,13 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		/**
 		 * Return the donation status based on the webhook event.
 		 * Success is currently the only webhook that will be sent
-		 * 
+		 *
 		 * @since  1.7.0
 		 *
 		 * @return string
 		 */
 		public function get_donation_status() {
+
 			switch ( $this->data->status ) {
 
 				case 'failed':
@@ -324,6 +329,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return string
 		 */
 		public function get_response_message() {
+
 			if ( $this->data->message !== null ) {
 				return $this->data->message;
 			}
@@ -349,58 +355,53 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		private function parse_request() {
 
 			if ( ! $this->is_valid_request() ) {
-				$this->set_invalid_request( __( 'Invalid request', 'charitable-Paystack' ) );
+				$this->set_invalid_request( __( 'Invalid request', 'charitable-paystack' ) );
 				return;
 			}
 
+			/*Collect the payload and make sure it contains data*/
 			$payload = file_get_contents( 'php://input' );
-
 			if ( empty( $payload ) ) {
-				$this->set_invalid_request( __( 'Empty data', 'charitable-Paystack' ) );
+				$this->set_invalid_request( __( 'Empty data', 'charitable-paystack' ) );
 				return;
 			}
 
-            $gateway = $this->donation->get_gateway();
-            $keys = $gateway->get_keys();
+			/*Check the IP sending the webhook is one of their provided IPs found on their webhooks page*/
+			if ($_SERVER['REMOTE_ADDR'] !== "52.31.139.75" && $_SERVER['REMOTE_ADDR'] !== "52.49.173.169" && $_SERVER['REMOTE_ADDR'] !== "52.214.14.220") {
+				$this->set_invalid_request( __( 'Webhook coming from invalid IP address', 'charitable-paystack' ) );
+				return;
+			}
 
-			//Check the signature is correct, i.e. signed with our key
+			/*Collect our keys*/
+			$gateway = new Charitable_Gateway_Paystack;
+			$keys = $gateway->get_keys();
+
+			/*Check the signature is correct, i.e. signed with our key*/
             if($_SERVER['HTTP_X_PAYSTACK_SIGNATURE'] !== hash_hmac('sha512', $payload, $keys['secret_key'])) {
-                $this->set_invalid_request( __( 'Invalid keys', 'charitable-Paystack' ) );
+                $this->set_invalid_request( __( 'Invalid keys', 'charitable-paystack' ) );
 				return;
             }
 
-			/*
-			//Check the IP sending the webhook is one of their provided IPs found on their webhooks page
-			if ($_SERVER['REMOTE_ADDR'] !== "52.31.139.75" && $_SERVER['REMOTE_ADDR'] !== "52.49.173.169" && $_SERVER['REMOTE_ADDR'] !== "52.214.14.220") {
-				$this->set_invalid_request( __( 'Webhook coming from invalid IP address', 'charitable-Paystack' ) );
-				return;
-			}
-			*/
-			
+			/*Data received*/
             http_response_code(200);
 
-			//parse_str( $payload, $this->data );
-            $this->data = json_decode($payload);
-
-			if ( defined( 'CHARITABLE_DEBUG' ) && CHARITABLE_DEBUG ) {
-				error_log( var_export( $this->data, true ) );
-			}
+			//Collect the data from the payload
+            $this->data =  json_decode($payload)->data;
 
 			//Currently only transaction webhooks are supported
-			if ( empty( $this->data ) || ! array_key_exists( 'data', $this->data) || ! array_key_exists( 'reference', $this->data['data']) ) {
-				$this->set_invalid_request( __( 'Invalid data, or wrong event', 'charitable-Paystack' ) );
+			if ( empty( $this->data ) || ! isset( $this->data ) || ! isset( $this->data->reference ) ) {
+				$this->set_invalid_request( __( 'Invalid data, or wrong event', 'charitable-paystack' ) );
 				return;
 			}
-
 			/* See if we have a donation stored with this transaction ID. */
-			$this->donation_id = charitable_get_donation_by_transaction_id( $this->data['reference'] );
+			$this->donation_id = charitable_get_donation_by_transaction_id( $this->data->reference );
 
 			/* Check that the donation is valid. */
 			if ( is_null( $this->donation_id ) || ! $this->get_donation() ) {
-				$this->set_invalid_request( __( 'No such donation here.', 'charitable-Paystack' ) );
+				$this->set_invalid_request( __( 'No such donation here.', 'charitable-paystack' ) );
 				return;
 			}
-
+			
 			/* We're still here. Webhook is valid. */
 			$this->valid = true;
 		}
