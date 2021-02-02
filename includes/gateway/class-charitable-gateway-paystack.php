@@ -27,6 +27,16 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 		const ID = 'paystack';
 
 		/**
+		 * Boolean flag recording whether the gateway hooks
+		 * have been set up.
+		 *
+		 * @since 1.0.0
+		 *
+		 * @var   boolean
+		 */
+		private static $setup = false;
+
+		/**
 		 * API object.
 		 *
 		 * @since 1.0.0
@@ -62,6 +72,41 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 			 * Needed for backwards compatibility with Charitable < 1.3
 			 */
 			$this->credit_card_form = false;
+
+			$this->setup();
+		}
+
+		/**
+		 * description
+		 *
+		 * @since  since
+		 *
+		 * @return mixed
+		 */
+		public function setup() {
+			if ( self::$setup ) {
+				return;
+			}
+
+			self::$setup = true;
+
+			/**
+			 * Register our new gateway.
+			 *
+			 * @see Charitable_Gateway_Paystack::register_gateway()
+			 */
+			add_filter( 'charitable_payment_gateways', [ $this, 'register_gateway' ] );
+
+			/**
+			 * Process the donation.
+			 *
+			 * @see Charitable_Gateway_Paystack::process_donation()
+			 */
+			add_filter( 'charitable_process_donation_paystack', [ $this, 'process_donation' ], 10, 3 );
+
+			add_action( 'init', [ $this, 'process_response' ] );
+
+			add_action( 'charitable_process_refund_paystack', [ $this, 'refund_donation_from_dashboard' ] );
 		}
 
 		/**
@@ -109,7 +154,7 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 		 * @param  string[] $gateways The list of registered gateways.
 		 * @return string[]
 		 */
-		public static function register_gateway( $gateways ) {
+		public function register_gateway( $gateways ) {
 			$gateways['paystack'] = 'Charitable_Gateway_Paystack';
 			return $gateways;
 		}
@@ -224,15 +269,12 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 		 * @return boolean|array
 		 */
 		public function process_donation( $return, $donation_id, $processor ) {
-			//error_log(__METHOD__);
-			$gateway     = new Charitable_Gateway_Paystack();
-
 			$donation    = charitable_get_donation( $donation_id );
 			$donor       = $donation->get_donor();
 			$values      = $processor->get_donation_data();
 
 			// API keys
-			$keys        = $gateway->get_keys();
+			$keys        = $this->get_keys();
 
 			// Donation fields
 			// $donation_key = $donation->get_donation_key();
@@ -291,11 +333,16 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 					'callback_url' 	=> $return_url,
 					//'cancel_url' 	=> $cancel_url,
 					'currency' 		=> $currency,
-				]
+					'metadata'      => array(
+						'donation_id'  => $donation_id,
+						'donation_key' => $donation->get_donation_key(),
+					)
+				],
+				$timeout = 10
 			);
 
 			//Catch failed requests
-			$error = $gateway->api->get_last_result();
+			$error = $this->api->get_last_result();
 
 			if ( is_wp_error($error) ) {
 				return false;
@@ -322,30 +369,12 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 			$donation->set_gateway_transaction_id($reference);
 
 			return $redirect_array;
-
-		}
-
-		/**
-		 * Process an IPN request.
-		 *
-		 * @since  1.0.0
-		 *
-		 * @return void
-		 */
-		public static function process_ipn() {
-			/**
-			 * Process the IPN.
-			 *
-			 * @todo
-			 */
 		}
 
 		public static function process_response() {
 			if ( ! isset( $_GET['reference'] )) {
 				return;
 			}
-
-			$gateway = new Charitable_Gateway_Paystack();
 
 			//Collect the payment reference to find by donation ID
 			$reference = $_GET['reference'];
@@ -366,7 +395,7 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 			/* Update our donation */
 			$donation = charitable_get_donation( $donation_id );
 			$donation->update_status( 'charitable-completed' );
-			$keys     = $gateway->get_keys();
+			$keys     = $this->get_keys();
 
 			//Check whether the payment has gone through
 			$getResponse = $gateway->api()->get(
@@ -390,10 +419,9 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 
 			/* Avoid processing this response again. */
 			add_post_meta( $donation_id, '_charitable_processed_paystack_response', true );
-
 		}
 
-	/**
+		/**
 		 * Check whether a particular donation can be refunded automatically in Paystack.
 		 *
 		 * @since  1.0.0
@@ -402,10 +430,7 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 		 * @return boolean
 		 */
 		public function is_donation_refundable( Charitable_Donation $donation ) {
-
-			$gateway     	= new Charitable_Gateway_Paystack();
-
-			$keys 			= $gateway->get_keys();
+			$keys 			= $this->get_keys();
 
 			$private_key 	= $keys['secret_key'];
 
@@ -424,11 +449,9 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 		 * @param  int $donation_id The donation ID.
 		 * @return boolean
 		 */
-
-
 		public static function refund_donation_from_dashboard( $donation_id ) {
-
 			$donation = charitable_get_donation( $donation_id );
+
 			if ( ! $donation ) {
 				return false;
 			}
@@ -437,8 +460,6 @@ if ( ! class_exists( 'Charitable_Gateway_Paystack' ) ) :
 			if ( ! $transaction ) {
 				return false;
 			}
-
-			$gateway = new Charitable_Gateway_Paystack();
 
 			try {
 

@@ -124,6 +124,8 @@ if ( ! class_exists( 'Charitable_Paystack' ) ) :
 
 			$this->attach_hooks_and_filters();
 
+			$this->gateway = new Charitable_Gateway_Paystack();
+
 			/**
 			 * Do something when the plugin is first started.
 			 *
@@ -232,30 +234,6 @@ if ( ! class_exists( 'Charitable_Paystack' ) ) :
 		 * @return void
 		 */
 		private function attach_hooks_and_filters() {
-			/**
-			 * Register our new gateway.
-			 *
-			 * @see Charitable_Gateway_Paystack::register_gateway()
-			 */
-			add_filter( 'charitable_payment_gateways', [ 'Charitable_Gateway_Paystack', 'register_gateway' ] );
-
-			/**
-			 * Validate the donation form submission before processing.
-			 *
-			 * @see Charitable_Gateway_Paystack::validate_donation()
-			 */
-			// add_filter( 'charitable_validate_donation_form_submission_gateway', [ 'Charitable_Gateway_Paystack', 'validate_donation' ], 10, 3 );
-
-			/**
-			 * Process the donation.
-			 *
-			 * @see Charitable_Gateway_Paystack::process_donation()
-			 */
-			add_filter( 'charitable_process_donation_paystack', [ 'Charitable_Gateway_Paystack', 'process_donation' ], 10, 3 );
-
-			add_action( 'init', [ 'Charitable_Gateway_Paystack', 'process_response' ] );
-
-			add_action( 'charitable_process_refund_paystack', [ 'Charitable_Gateway_Paystack', 'refund_donation_from_dashboard' ] );
 		}
 
 		/**

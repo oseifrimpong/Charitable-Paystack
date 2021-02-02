@@ -1,0 +1,42 @@
+{
+    "name": "wpcharitable/charitable-paystack",
+    "description": "Accept donations with Paystack.",
+    "keywords": [
+		"wordpress",
+		"wpcharitable",
+		"paystack"
+	],
+    "homepage": "https://www.wpcharitable.com/",
+    "type": "wordpress-plugin",
+    "license": "GPL-3.0-or-later",
+    "authors": [
+		{
+			"name": "WP Charitable",
+			"homepage": "https://www.wpcharitable.com"
+		}
+	],
+    "support": {
+		"email": "support@wpcharitable.com",
+		"issues": "https://github.com/Charitable/Charitable-Paystack/issues",
+		"source": "https://github.com/Charitable/Charitable-Paystack"
+	},
+    "autoload": {
+		"psr-4": {
+			"Charitable\\Pro\\Paystack\\": "src/"
+		}
+	},
+    "require": {
+        "wpcharitable/charitable-extension-activation": "^1.1"
+    },
+    "require-dev": {
+        "wp-cli/i18n-command": "2.2.5"
+    },
+    "scripts": {
+        "makepot-audit": [
+            "wp --allow-root i18n make-pot . --exclude=\"bin,node_modules,tests\" --slug=charitable-paystack"
+        ],
+        "makepot": [
+            "@makepot-audit --skip-audit"
+        ]
+    }
+}

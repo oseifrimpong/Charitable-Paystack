@@ -1,0 +1,6 @@
+[submodule "packages/charitable-webhooks"]
+	path = packages/charitable-webhooks
+	url = git@github.com:Charitable/Charitable-Webhooks.git
+[submodule "packages/charitable-gateways"]
+	path = packages/charitable-gateways
+	url = git@github.com:Charitable/Charitable-Gateways.git

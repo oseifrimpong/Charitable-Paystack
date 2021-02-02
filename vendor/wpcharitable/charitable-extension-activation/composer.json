@@ -1,0 +1,30 @@
+{
+	"name": "wpcharitable/charitable-extension-activation",
+	"description": "Charitable's extension activation helper class.",
+	"keywords": [
+		"wordpress",
+		"wpcharitable",
+		"charitable"
+	],
+	"homepage": "https://www.wpcharitable.com/",
+	"license": "GPL-3.0-or-later",
+	"authors": [
+		{
+			"name": "WP Charitable",
+			"homepage": "https://www.wpcharitable.com"
+		}
+	],
+	"support": {
+		"email": "support@wpcharitable.com",
+		"issues": "https://github.com/Charitable/Charitable-Extension-Activation/issues",
+		"source": "https://github.com/Charitable/Charitable-Extension-Activation"
+	},
+	"require": {
+		"php": ">=5.6.0"
+	},
+	"autoload": {
+		"psr-4": {
+			"Charitable\\Extensions\\Activation\\": "src/"
+		}
+	}
+}
