@@ -137,18 +137,18 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Gateway' ) ) :
 				'live_keys'         => array(
 					'title'    => __( 'Live Mode Settings', 'charitable-paystack' ),
 					'type'     => 'heading',
-					'priority' => 2,
+					'priority' => 4,
 				),
 				'live_secret_key' => array(
 					'type'     => 'text',
 					'title'    => __( 'Live Secret Key', 'charitable-paystack' ),
-					'priority' => 4,
+					'priority' => 6,
 					'class'    => 'wide',
 				),
 				'live_public_key'  => array(
 					'type'     => 'text',
 					'title'    => __( 'Live Publishable Key', 'charitable-paystack' ),
-					'priority' => 6,
+					'priority' => 8,
 					'class'    => 'wide',
 				),
 				'test_keys'         => array(

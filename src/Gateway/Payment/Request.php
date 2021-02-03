@@ -12,7 +12,6 @@
 
 namespace Charitable\Pro\Paystack\Gateway\Payment;
 
-use Charitable\Pro\Paystack\Gateway\Api;
 use Charitable\Gateways\Payment\RequestInterface;
 use Charitable\Gateways\Payment\ResponseInterface;
 use Charitable\Helpers\DonationDataMapper;

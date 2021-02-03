@@ -12,8 +12,6 @@
 
 namespace Charitable\Pro\Paystack\Gateway\Payment;
 
-use Charitable\Pro\Paystack\Gateway\Api;
-
 // Exit if accessed directly.
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -64,7 +62,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Customer' ) ) :
 		 */
 		public function __construct( $args ) {
 			$this->args      = $args;
-			$this->test_mode = isset( $this->args['test_mode'] ) ?? charitable_get_option( 'test_mode', false );
+			$this->test_mode = $this->args['test_mode'] ?? charitable_get_option( 'test_mode', false );
 		}
 
 		/**
