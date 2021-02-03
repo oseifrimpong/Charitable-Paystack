@@ -29,13 +29,22 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Customer' ) ) :
 	class Customer {
 
 		/**
-		 * Internal arguments used for defining a particular plan.
+		 * Internal arguments used for defining a particular customer.
 		 *
 		 * @since 1.0.0
 		 *
 		 * @var   array
 		 */
 		private $args;
+
+		/**
+		 * Whether we are making requests in test mode.
+		 *
+		 * @since 1.0.0
+		 *
+		 * @var   boolean
+		 */
+		private $test_mode;
 
 		/**
 		 * The Customer object from Paystack.
@@ -54,7 +63,8 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Customer' ) ) :
 		 * @param array $args Mixed set of args.
 		 */
 		public function __construct( $args ) {
-			$this->args = $args;
+			$this->args      = $args;
+			$this->test_mode = isset( $this->args['test_mode'] ) ?? charitable_get_option( 'test_mode', false );
 		}
 
 		/**
@@ -87,7 +97,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Customer' ) ) :
 		 * @return \Charitable\Pro\Paystack\Gateway\Api
 		 */
 		public function api() {
-			return \charitable_paystack()->gateway()->api();
+			return \charitable_paystack()->gateway()->api( $this->test_mode );
 		}
 
 		/**

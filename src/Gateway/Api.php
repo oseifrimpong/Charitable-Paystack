@@ -192,8 +192,6 @@ class Api {
 		 *
 		 * We assume it is invalid if a WP_Error has been returned, or if a 401 response code
 		 * was returned.
-		 *
-		 * @see https://developers.Paystack.com/docs/response
 		 */
 		if ( ! isset( $this->api_key_validated ) ) {
 			$this->api_key_validated = $this->api_key_validated( $this->last_response );
