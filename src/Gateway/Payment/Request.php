@@ -96,7 +96,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Request' ) ) :
 		 * @return boolean
 		 */
 		public function prepare_request() {
-			Customer::create_or_update( $this->data_map->get_data( 'email', 'customer' ) );
+			Customer::create_or_update( $this->data_map->get_data( array( 'email', 'customer' ) ) );
 
 			$this->request_data = $this->data_map->get_data( array( 'email', 'amount', 'currency', 'callback_url', 'metadata' ) );
 
@@ -106,7 +106,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Request' ) ) :
 			if ( $recurring_donation ) {
 				$plan = Plan::init_with_recurring_donation( $recurring_donation );
 
-				$this->request_data['plan'] = $plan->id;
+				$this->request_data['plan'] = $plan->plan_code;
 			}
 
 			return true;
@@ -139,6 +139,14 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Request' ) ) :
 
 				if ( is_wp_error( $response ) ) {
 					charitable_get_notices()->add_errors_from_wp_error( $this->api()->get_last_response() );
+				} else {
+					charitable_get_notices()->add_error(
+						sprintf(
+							/* Translators: %s: error message */
+							__( 'Donation failed in gateway with error: %s', 'charitable-paystack') ,
+							json_decode( wp_remote_retrieve_body( $response ) )->message
+						)
+					);
 				}
 
 				return false;
@@ -148,7 +156,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Request' ) ) :
 				charitable_get_notices()->add_error(
 					sprintf(
 						/* Translators: %s: error message */
-						__( 'Donation failed in gateway with error: "%s"', 'charitable-paystack') ,
+						__( 'Donation failed in gateway with error: %s', 'charitable-paystack') ,
 						$this->response_data->message
 					)
 				);

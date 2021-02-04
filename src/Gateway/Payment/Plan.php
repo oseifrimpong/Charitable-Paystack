@@ -120,18 +120,38 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Plan' ) ) :
 			/* We assume there is only one campaign being donated to. */
 			$campaign_id = current( $recurring_donation->get_campaign_donations() )->campaign_id;
 
+			$amount = $recurring_donation->get_recurring_donation_amount();
+
 			if ( $recurring_donation->get( 'cover_fees' ) ) {
-				return $recurring_donation->get( 'total_donation_with_fees' );
+				$amount = $recurring_donation->get( 'total_donation_with_fees' );
 			}
 
 			return new Plan(
 				$campaign_id,
 				array(
 					'period'   => $recurring_donation->get_donation_period(),
-					'amount'   => $recurring_donation->get_recurring_donation_amount() * 100,
+					'amount'   => $amount * 100,
 					'interval' => 1,
 				)
 			);
+		}
+
+		/**
+		 * Return a plan object property.
+		 *
+		 * @since  1.0.0
+		 *
+		 * @param  string $property The plan property to get.
+		 * @return mixed|null
+		 */
+		public function __get( $property ) {
+			if ( isset( $this->$property ) ) {
+				return $this->$property;
+			}
+
+			$plan = $this->get();
+
+			return $plan ? $plan->data->$property : null;
 		}
 
 		/**
@@ -152,13 +172,13 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Plan' ) ) :
 		 *
 		 * @return object|false
 		 */
-		public function get_plan() {
+		public function get() {
 			if ( ! isset( $this->plan ) ) {
 				$plan_id = $this->get_plan_id();
 
 				/* Create or return the plan object. */
 				if ( ! $plan_id ) {
-					$this->plan = $this->create_plan();
+					$this->plan = $this->create();
 				} else {
 					$this->plan = $this->api()->get( 'plan/' . $plan_id );
 				}
@@ -174,7 +194,11 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Plan' ) ) :
 		 *
 		 * @return object|false
 		 */
-		public function create_plan() {
+		public function create() {
+			if ( ! isset( $this->args['amount'] ) ) {
+				return false;
+			}
+
 			/**
 			 * Filter the plan arguments.
 			 *
@@ -189,7 +213,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Plan' ) ) :
 				'charitable_paystack_plan_args',
 				array(
 					'name'          => $this->get_plan_name(),
-					'amount'        => $this->get_plan_amount(),
+					'amount'        => $this->args['amount'],
 					'description'   => 'Plan Description',
 					'interval'      => $this->get_plan_interval(),
 					'currency'      => charitable_get_currency(),
@@ -266,7 +290,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Plan' ) ) :
 				/* translators: %1$s: recurring donation interval/period; %2$s: campaign name */
 				__( '%1$s Donation to %2$s', 'charitable-paystack' ),
 				ucfirst( $this->get_plan_interval() ),
-				get_post_title( $this->campaign_id )
+				get_the_title( $this->campaign_id )
 			);
 		}
 

@@ -172,13 +172,9 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Customer' ) ) :
 				return false;
 			}
 
-			$customer_code = get_metadata( 'donor', $donor_id, $this->get_customer_meta_key(), true );
+			$this->customer = $this->api()->put( 'customer/' . $this->get()->data->customer_code, $this->args['customer'] );
 
-			if ( ! $customer_code ) {
-				return false;
-			}
-
-			$this->customer = $this->api()->put( 'customer/' . $customer_code, $this->args['customer'] );
+			update_metadata( 'donor', $this->get_donor_id(), $this->get_customer_meta_key(), $this->customer->data->customer_code );
 
 			return $this->customer;
 		}

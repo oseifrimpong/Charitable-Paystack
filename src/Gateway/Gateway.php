@@ -313,17 +313,41 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Gateway' ) ) :
 
 				if ( is_wp_error( $response ) ) {
 					charitable_get_notices()->add_errors_from_wp_error( $response );
+				} else {
+					charitable_get_notices()->add_error(
+						sprintf(
+							/* Translators: %s: error message */
+							__( 'Donation failed in gateway with error: %s', 'charitable-paystack') ,
+							json_decode( wp_remote_retrieve_body( $response ) )->message
+						)
+					);
 				}
 
 				return false;
 			}
 
+			/* Get the recurring donation, if applicable. */
+			$recurring_donation = $donation->get_donation_plan();
+
 			/* Mark the donation as complete. */
 			if ( 'success' === $result->data->status )  {
 				$donation->update_status( 'charitable-completed' );
+
+				if ( $recurring_donation ) {
+					/* Activate the subscription. */
+					$recurring_donation->renew();
+					// $this->save_gateway_subscription_data();
+				}
 			} else {
 				$donation->update_donation_log( $result->message );
 				$donation->update_status( 'charitable-failed' );
+			}
+
+			/* Update the recurring donation. */
+			$recurring_donation = $donation->get_donation_plan();
+
+			if ( $recurring_donation ) {
+
 			}
 
 			/* Avoid processing this response again. */
