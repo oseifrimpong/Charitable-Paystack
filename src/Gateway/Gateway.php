@@ -305,53 +305,83 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Gateway' ) ) :
 			}
 
 			/* Verify whether the payment has been completed. */
-			$result = $this->api( $donation->get_test_mode( false ) )->get( 'transaction/verify/' . $reference, array() );
+			$transaction = $this->verify_transaction( $reference, $donation->get_test_mode( false ) );
 
-			/* The API request failed for some reason. */
-			if ( false === $result ) {
-				$response = $this->api()->get_last_response();
+			/* Add a notice for the verification error. */
+			$response = $this->api()->get_last_response();
 
-				if ( is_wp_error( $response ) ) {
-					charitable_get_notices()->add_errors_from_wp_error( $response );
-				} else {
-					charitable_get_notices()->add_error(
-						sprintf(
-							/* Translators: %s: error message */
-							__( 'Donation failed in gateway with error: %s', 'charitable-paystack') ,
-							json_decode( wp_remote_retrieve_body( $response ) )->message
-						)
-					);
-				}
-
-				return false;
+			if ( is_wp_error( $response ) ) {
+				charitable_get_notices()->add_errors_from_wp_error( $response );
+			} else {
+				charitable_get_notices()->add_error(
+					sprintf(
+						/* Translators: %s: error message */
+						__( 'Donation failed in gateway with error: %s', 'charitable-paystack') ,
+						json_decode( wp_remote_retrieve_body( $response ) )->message
+					)
+				);
 			}
 
 			/* Get the recurring donation, if applicable. */
 			$recurring_donation = $donation->get_donation_plan();
 
 			/* Mark the donation as complete. */
-			if ( 'success' === $result->data->status )  {
+			if ( 'success' === $transaction->data->status )  {
 				$donation->update_status( 'charitable-completed' );
+
+				/** @todo Replace with call to $this->donation->set_gateway_transaction_url() once it's in core */
+				\Charitable\Packages\Gateways\set_gateway_transaction_url(
+					sprintf( 'https://dashboard.paystack.com/#/transactions/%s', $transaction->data->id ),
+					$donation
+				);
 
 				if ( $recurring_donation ) {
 					/* Activate the subscription. */
 					$recurring_donation->renew();
-					// $this->save_gateway_subscription_data();
+
+					/* Record the Authorization code. This is how we link a Paystack subscription to our recurring donation. */
+					update_post_meta( $recurring_donation->ID, '_charitable_paystack_authorization_code', $transaction->data->authorization->authorization_code );
 				}
 			} else {
-				$donation->update_donation_log( $result->message );
+				$donation->update_donation_log( $transaction->message );
 				$donation->update_status( 'charitable-failed' );
-			}
 
-			/* Update the recurring donation. */
-			$recurring_donation = $donation->get_donation_plan();
-
-			if ( $recurring_donation ) {
-
+				if ( $recurring_donation ) {
+					$recurring_donation->set_to_failed( __( 'Initial donation failed.', 'charitable-paystack' ) );
+				}
 			}
 
 			/* Avoid processing this response again. */
 			add_post_meta( $donation_id, '_charitable_processed_paystack_response', true );
+		}
+
+		/**
+		 * Verify a transaction, given the reference.
+		 *
+		 * @since  1.0.0
+		 *
+		 * @param  string  $reference The transaction reference.
+		 * @param  boolean $test_mode Whether the transaction was made in test mode.
+		 * @return false|object
+		 */
+		public function verify_transaction( $reference, $test_mode ) {
+			return $this->api( $test_mode )->get( 'transaction/verify/' . $reference, array() );
+		}
+
+		/**
+		 * Given a transaction verification, try to get the related Paystack subscription id.
+		 *
+		 * @since  1.0.0
+		 *
+		 * @param  object $result The verification result.
+		 * @return string|false
+		 */
+		public function get_paystack_subscription_id( $result ) {
+			if ( is_null( $result->data->plan ) ) {
+				return false;
+			}
+
+
 		}
 
 		/**

@@ -182,10 +182,10 @@ class Api {
 
 		$this->last_response = wp_remote_request( $url, $request_args );
 
-		if ( defined( 'CHARITABLE_DEBUG' ) && CHARITABLE_DEBUG ) {
-			error_log( __METHOD__ );
-			error_log( var_export( $this->last_response, true ) );
-		}
+		// if ( defined( 'CHARITABLE_DEBUG' ) && CHARITABLE_DEBUG ) {
+		// 	error_log( __METHOD__ );
+		// 	error_log( var_export( $this->last_response, true ) );
+		// }
 
 		/**
 		 * If this is the first time we've called the API, check whether the API key is valid.

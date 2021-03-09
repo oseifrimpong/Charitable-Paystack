@@ -12,6 +12,7 @@
 
 namespace Charitable\Pro\Paystack\Gateway\Webhook;
 
+use Charitable\Pro\Paystack\Gateway;
 use Charitable\Pro\Paystack\Gateway\Api;
 use Charitable\Webhooks\Interpreters\DonationInterpreterInterface;
 use Charitable\Webhooks\Interpreters\SubscriptionInterpreterInterface;
@@ -29,6 +30,15 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 	 * @since 1.0.0
 	 */
 	class Interpreter implements DonationInterpreterInterface, SubscriptionInterpreterInterface {
+
+		/**
+		 * Whether the request is valid and can be used.
+		 *
+		 * @since 1.0.0
+		 *
+		 * @var   boolean
+		 */
+		private $valid;
 
 		/**
 		 * The response message to send.
@@ -67,22 +77,31 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		private $donation;
 
 		/**
-		 * The payment object from Paystack.
+		 * The recurring donation object.
 		 *
 		 * @since 1.0.0
 		 *
-		 * @var   object
+		 * @var   Charitable_Recurring_Donation|false
 		 */
-		private $payment;
+		private $recurring_donation;
 
 		/**
-		 * The parsed data.
+		 * The parsed payload data.
 		 *
 		 * @since 1.0.0
 		 *
 		 * @var   array
 		 */
-		private $data;
+		private $payload;
+
+		/**
+		 * The transaction object.
+		 *
+		 * @since 1.0.0
+		 *
+		 * @var   object|false
+		 */
+		private $transaction;
 
 		/**
 		 * Set up interpreter object.
@@ -102,7 +121,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return mixed
 		 */
 		public function __get( $prop ) {
-			return $this->$prop;
+			return $this->$prop ?? ( $this->payload->$prop ?? null );
 		}
 
 		/**
@@ -114,7 +133,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return boolean
 		 */
 		public function __isset( $prop ) {
-			return isset( $this->$prop );
+			return isset( $this->$prop ) || isset( $this->payload->$prop );
 		}
 
 		/**
@@ -149,11 +168,15 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return string
 		 */
 		public function get_event_subject() {
-			if ( 'oneoff' === $this->payment->sequenceType ) {
-				return 'donation';
-			}
+			switch ( $this->event ) {
+				case 'charge.create':
+				case 'charge.success':
+					return 'donation';
 
-			return 'subscription';
+				case 'subscription.create':
+				case 'invoice.create':
+					return 'subscription';
+			}
 		}
 
 		/**
@@ -166,7 +189,11 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		public function get_donation() {
 			if ( ! isset( $this->donation ) ) {
 				if ( is_null( $this->donation_id ) ) {
-					return false;
+					if ( $this->get_recurring_donation() ) {
+						$this->donation_id = $this->get_recurring_donation()->get_first_donation_id();
+					} else {
+						return false;
+					}
 				}
 
 				/* The donation ID needs to match a donation post type. */
@@ -186,23 +213,6 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		}
 
 		/**
-		 * Get the Paystack payment object.
-		 *
-		 * @since  1.0.0
-		 *
-		 * @return object|false Returns the payment object if one exists.
-		 */
-		public function get_payment() {
-			if ( ! isset( $this->payment ) ) {
-				$test_mode     = is_null( $this->donation_id ) ? charitable_get_option( 'test_mode' ) : $this->get_donation()->get_test_mode( false );
-				$api           = new Api( $test_mode );
-				$this->payment = $api->get( 'payments/' . $this->data['id'] . '?embed=refunds' );
-			}
-
-			return $this->payment;
-		}
-
-		/**
 		 * Get the type of event described by the webhook.
 		 *
 		 * @since  1.0.0
@@ -210,37 +220,13 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return string
 		 */
 		public function get_event_type() {
-			/* Payment has been fully refunded. */
-			if ( $this->get_refund_amount() ) {
-				return 'refund';
+			switch ( $this->event ) {
+				case 'subscription.create':
+					return 'first_payment';
+
+				case 'invoice.create':
+					return 'renewal';
 			}
-
-			switch ( $this->get_payment()->status ) {
-				case 'canceled':
-				case 'expired':
-					return 'cancellation';
-
-				case 'failed':
-					return 'failed_payment';
-
-				case 'paid':
-					if ( 'subscription' !== $this->get_event_subject() ) {
-						return 'completed_payment';
-					}
-
-					return $this->is_first_payment() ? 'first_payment' : 'renewal';
-			}
-		}
-
-		/**
-		 * Checks whether the payment has a mandate.
-		 *
-		 * @since  1.0.0
-		 *
-		 * @return boolean
-		 */
-		public function has_mandate() {
-			return isset( $this->get_payment()->mandateId );
 		}
 
 		/**
@@ -251,18 +237,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return boolean
 		 */
 		public function is_renewal() {
-			return 'recurring' === $this->get_payment()->sequenceType;
-		}
-
-		/**
-		 * Checks whether the payment is the first for a subscription.
-		 *
-		 * @since  1.0.0
-		 *
-		 * @return boolean
-		 */
-		public function is_first_payment() {
-			return 'first' === $this->get_payment()->sequenceType;
+			return 'invoice.create' === $this->event;
 		}
 
 		/**
@@ -273,11 +248,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return float|false The amount to be refunded, or false if this is not a refund.
 		 */
 		public function get_refund_amount() {
-			if ( ! isset( $this->get_payment()->amountRefunded ) || '0.00' === $this->get_payment()->amountRefunded->value ) {
-				return false;
-			}
-
-			return end( $this->get_payment()->_embedded->refunds )->amount->value;
+			return false;
 		}
 
 		/**
@@ -288,7 +259,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return string
 		 */
 		public function get_refund_log_message() {
-			return end( $this->get_payment()->_embedded->refunds )->description;
+			return '';
 		}
 
 		/**
@@ -299,7 +270,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return array
 		 */
 		public function get_refunds() {
-			return $this->get_payment()->_embedded->refunds;
+			return array();
 		}
 
 		/**
@@ -310,7 +281,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return string|false The gateway transaction ID if available, otherwise false.
 		 */
 		public function get_gateway_transaction_id() {
-			return $this->get_payment()->id;
+			return $this->transaction->data->reference ?? $this->data->reference;
 		}
 
 		/**
@@ -321,7 +292,10 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return string|false The URL if available, otherwise false.
 		 */
 		public function get_gateway_transaction_url() {
-			return $this->get_payment()->_links->dashboard->href;
+			return sprintf(
+				'https://dashboard.paystack.com/#/transactions/%s',
+				$this->transaction->data->id ?? $this->data->id
+			);
 		}
 
 		/**
@@ -359,21 +333,6 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		public function get_logs() {
 			$logs = array();
 
-			switch ( $this->get_payment()->status ) {
-				case 'expired':
-					$logs[] = __( 'Payment expired.', 'charitable-paystack' );
-					break;
-			}
-
-			/* Log refund notes. */
-			if ( $this->get_refund_amount() && $this->get_payment()->description !== $this->get_refund_log_message() ) {
-				$logs[] = sprintf(
-					/* translators: %s: refund note */
-					__( 'Refund note: "%s"', 'charitable-paystack' ),
-					$this->get_refund_log_message()
-				);
-			}
-
 			return $logs;
 		}
 
@@ -386,14 +345,67 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 *                                             If not, returns false.
 		 */
 		public function get_recurring_donation() {
-			if ( $this->is_renewal() ) {
-				$this->recurring_donation = charitable_recurring_get_subscription_by_gateway_id( $this->get_gateway_subscription_id(), 'paystack' );
-			} else {
-				$this->donation           = $this->get_donation();
-				$this->recurring_donation = $this->donation->get_donation_plan();
+			if ( ! isset( $this->recurring_donation ) ) {
+				if ( $this->is_renewal() ) {
+					$this->recurring_donation = charitable_recurring_get_subscription_by_gateway_id( $this->get_gateway_subscription_id(), 'paystack' );
+				} else {
+					$this->recurring_donation = $this->get_recurring_donation_by_authorization_code();
+				}
 			}
 
 			return $this->recurring_donation;
+		}
+
+		/**
+		 * Get a recurring donation using the authorization code.
+		 *
+		 * @since  1.0.0
+		 *
+		 * @global WPDB $wpdb
+		 * @return Charitable_Recurring_Donation|false
+		 */
+		public function get_recurring_donation_by_authorization_code() {
+			if ( ! isset( $this->data->authorization->authorization_code ) ) {
+				return false;
+			}
+
+			global $wpdb;
+
+			$recurring_id = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT post_id FROM $wpdb->postmeta WHERE meta_key = '_charitable_paystack_authorization_code' AND meta_value = %s",
+					$this->data->authorization->authorization_code
+				)
+			);
+
+			return $recurring_id ? charitable_get_donation( $recurring_id ) : false;
+		}
+
+		/**
+		 * Verify the invoice transaction.
+		 *
+		 * @since  1.0.0
+		 *
+		 * @return false|object
+		 */
+		public function verify_invoice_transaction() {
+			error_log( var_export( __METHOD__, true ) );
+			error_log( $this->data->transaction->reference );
+			if ( ! isset( $this->data->transaction->reference ) ) {
+				return false;
+			}
+
+			/* Don't re-process an invoice that has already been processed. */
+			if ( charitable_get_donation_by_transaction_id( $this->data->transaction->reference ) ) {
+				return false;
+			}
+
+			$test_mode = 'test' === $this->data->domain;
+
+			return ( new Api( $test_mode ) )->get(
+				'transaction/verify/' . $this->data->transaction->reference,
+				array()
+			);
 		}
 
 		/**
@@ -404,7 +416,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return mixed|false
 		 */
 		public function get_gateway_subscription_id() {
-			return $this->get_payment()->subscriptionId ?? false;
+			return $this->subscription->subscription_code ?? false;
 		}
 
 		/**
@@ -415,7 +427,11 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return mixed|false
 		 */
 		public function get_gateway_subscription_url() {
-			return '';
+			if ( ! isset( $this->data->customer->customer_code ) ) {
+				return false;
+			}
+
+			return sprintf( 'https://dashboard.paystack.com/#/customers/%s/subscriptions', $this->data->customer->customer_code );
 		}
 
 		/**
@@ -484,31 +500,26 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 				return;
 			}
 
-			parse_str( $payload, $this->data );
+			$this->payload = json_decode( $payload );
 
 			if ( defined( 'CHARITABLE_DEBUG' ) && CHARITABLE_DEBUG ) {
 				error_log( __METHOD__ );
-				error_log( var_export( $this->data, true ) );
+				error_log( var_export( $this->payload, true ) );
 			}
 
-			if ( empty( $this->data ) || ! array_key_exists( 'id', $this->data ) ) {
+			if ( empty( $this->payload ) || ! isset( $this->event ) ) {
 				$this->set_invalid_request( __( 'Invalid data', 'charitable-paystack' ) );
 				return;
 			}
 
-			/* Try to find the donation ID based on the transaction ID passed. */
-			$this->donation_id = charitable_get_donation_by_transaction_id( $this->data['id'] );
+			/* If this is an invoice.create event, verify the transaction. */
+			if ( 'invoice.create' === $this->event ) {
+				$this->transaction = $this->verify_invoice_transaction();
+				error_log( var_export( __METHOD__, true ) );
+				error_log( var_export( $this->transaction, true ) );
 
-			/* Get the payment from Paystack. */
-			if ( ! $this->get_payment() ) {
-				$this->set_invalid_request( __( 'Invalid payment', 'charitable-paystack' ) );
-				return;
-			}
-
-			if ( ! $this->is_renewal() ) {
-				/* Confirmk that the donation is valid. */
-				if ( is_null( $this->donation_id ) || ! $this->get_donation() ) {
-					$this->set_invalid_request( __( 'No such donation here.', 'charitable-paystack' ) );
+				if ( ! $this->transaction ) {
+					$this->set_invalid_request( __( 'Unable to verify transaction, or transaction has already been processed', 'charitable-paystack' ) );
 					return;
 				}
 			}

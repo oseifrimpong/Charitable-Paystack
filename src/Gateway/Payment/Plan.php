@@ -303,6 +303,9 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Plan' ) ) :
 		 */
 		public function get_plan_interval() {
 			switch ( $this->args['period'] ) {
+				case 'hour':
+					return 'hourly';
+
 				case 'day':
 					return 'daily';
 

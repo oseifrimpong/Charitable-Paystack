@@ -55,7 +55,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Processor' ) ) :
 			$this->update_meta();
 			$this->update_logs();
 
-			$this->set_response( __( 'Donation Webhook: Refund processed', 'charitable' ) );
+			$this->set_response( __( 'Donation Webhook: Refund processed', 'charitable-paystack' ) );
 
 			return true;
 		}

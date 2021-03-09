@@ -2,12 +2,12 @@
 /**
  * Plugin Name:       Charitable - Paystack
  * Plugin URI:        https://www.wpcharitable.com/extensions/charitable-paystack
- * Description:       Accept donations with Paystack.
+ * Description:       Accept donations with Paystack, a leading payment processor in Africa.
  * Version:           1.0.0
  * Author:            WP Charitable
  * Author URI:        https://www.wpcharitable.com
  * Requires at least: 5.5
- * Tested up to:      5.6
+ * Tested up to:      5.6.1
  *
  * Text Domain: charitable-paystack
  * Domain Path: /languages/
