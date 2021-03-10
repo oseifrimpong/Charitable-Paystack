@@ -46,9 +46,9 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Gateway' ) ) :
 		 *
 		 * @since 1.0.0
 		 *
-		 * @var   \Charitable\Pro\Paystack\Gateway\Api
+		 * @var   \Charitable\Pro\Paystack\Gateway\Api[]
 		 */
-		private $api;
+		private $api = array();
 
 		/**
 		 * Instantiate the gateway class, defining its key values.
@@ -97,6 +97,10 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Gateway' ) ) :
 
 			/* Refund a donation from the dashboard. */
 			add_action( 'charitable_process_refund_paystack', array( $this, 'refund_donation_from_dashboard' ) );
+
+			/* Handle subscription cancellations. */
+			add_filter( 'charitable_recurring_can_cancel_paystack', array( $this, 'is_subscription_cancellable' ), 10, 2 );
+			add_action( 'charitable_process_cancellation_paystack', array( $this, 'cancel_subscription' ), 10, 2 );
 
 			/* Update the donation after the donor returns from Paystack. */
 			add_action( 'wp', array( $this, 'process_return_after_payment' ) );
@@ -225,55 +229,13 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Gateway' ) ) :
 		 * @return \Charitable\Pro\Paystack\Gateway\Api
 		 */
 		public function api( $test_mode = null ) {
-			if ( ! isset( $this->api ) ) {
-				$this->api = new \Charitable\Pro\Paystack\Gateway\Api( $test_mode );
+			$test_mode = is_null( $test_mode ) ? charitable_get_option( 'test_mode' ) : $test_mode;
+
+			if ( ! isset( $this->api[ $test_mode ] ) ) {
+				$this->api[ $test_mode ] = new \Charitable\Pro\Paystack\Gateway\Api( $test_mode );
 			}
 
-			return $this->api;
-		}
-
-		/**
-		 * Check whether a particular donation can be refunded automatically in Paystack.
-		 *
-		 * @since  1.0.0
-		 *
-		 * @param  \Charitable_Donation $donation The donation object.
-		 * @return boolean
-		 */
-		public function is_donation_refundable( \Charitable_Donation $donation ) {
-			return $this->api()->has_valid_api_key() && $donation->get_gateway_transaction_id();
-		}
-
-		/**
-		 * Process a refund initiated in the WordPress dashboard.
-		 *
-		 * @since  1.0.0
-		 *
-		 * @param  int $donation_id The donation ID.
-		 * @return boolean
-		 */
-		public function refund_donation_from_dashboard( $donation_id ) {
-			$donation = charitable_get_donation( $donation_id );
-
-			if ( ! $donation ) {
-				return false;
-			}
-
-			$api = $this->api();
-
-			if ( ! $api->has_api_key() ) {
-				return false;
-			}
-
-			$transaction = $donation->get_gateway_transaction_id();
-
-			if ( ! $transaction ) {
-				return false;
-			}
-
-			/**
-			 * @todo Make refund.
-			 */
+			return $this->api[ $test_mode ];
 		}
 
 		/**
@@ -312,7 +274,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Gateway' ) ) :
 			$transaction = $this->verify_transaction( $reference, $donation->get_test_mode( false ) );
 
 			/* Add a notice for the verification error. */
-			$response = $this->api()->get_last_response();
+			$response = $this->api( $donation->get_test_mode( false ) )->get_last_response();
 
 			if ( is_wp_error( $response ) ) {
 				charitable_get_notices()->add_errors_from_wp_error( $response );
@@ -373,22 +335,6 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Gateway' ) ) :
 		}
 
 		/**
-		 * Given a transaction verification, try to get the related Paystack subscription id.
-		 *
-		 * @since  1.0.0
-		 *
-		 * @param  object $result The verification result.
-		 * @return string|false
-		 */
-		public function get_paystack_subscription_id( $result ) {
-			if ( is_null( $result->data->plan ) ) {
-				return false;
-			}
-
-
-		}
-
-		/**
 		 * Process a Paystack webhook.
 		 *
 		 * @since  1.0.0
@@ -401,6 +347,203 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Gateway' ) ) :
 			\Charitable\Packages\Webhooks\handle( self::ID );
 		}
 
+
+		/**
+		 * Check whether a particular donation can be refunded automatically in Paystack.
+		 *
+		 * @since  1.0.0
+		 *
+		 * @param  \Charitable_Donation $donation The donation object.
+		 * @return boolean
+		 */
+		public function is_donation_refundable( \Charitable_Donation $donation ) {
+			return $this->api( $donation->get_test_mode( false ) )->has_valid_api_key()
+				&& $donation->get_gateway_transaction_id()
+				&& ! get_post_meta( $donation->ID, '_paystack_refunded', true );
+		}
+
+		/**
+		 * Process a refund initiated in the WordPress dashboard.
+		 *
+		 * @since  1.0.0
+		 *
+		 * @param  int $donation_id The donation ID.
+		 * @return boolean
+		 */
+		public function refund_donation_from_dashboard( $donation_id ) {
+			/* The donation has been refunded previously. */
+			if ( get_post_meta( $donation_id, '_paystack_refunded', true ) ) {
+				return false;
+			}
+
+			$donation = charitable_get_donation( $donation_id );
+
+			if ( ! $donation ) {
+				return false;
+			}
+
+			$api = $this->api( $donation->get_test_mode( false ) );
+
+			if ( ! $api->has_valid_api_key() ) {
+				return false;
+			}
+
+			$transaction = $donation->get_gateway_transaction_id();
+
+			if ( ! $transaction ) {
+				return false;
+			}
+
+			/* Post refund to Paystack. */
+			$response_data = $api->post(
+				'refund',
+				array(
+					'transaction'   => $transaction,
+					'merchant_note'	=> 'Refunded from Charitable dashboard',
+				),
+			);
+
+			/* Check for an error. */
+			if ( false === $response_data ) {
+				$response = $this->api()->get_last_response();
+				$error    = is_wp_error() ? $response->get_error_message() : json_decode( wp_remote_retrieve_body( $response ) )->message;
+				$donation->log()->add(
+					sprintf(
+						__( 'Paystack refund failed with message: %s', 'charitable-paystack' ),
+						$error
+					)
+				);
+
+				return false;
+			}
+
+			/* Double-check the response status. */
+			if ( ! $response_data->status ) {
+				$donation->log()->add(
+					sprintf(
+						__( 'Paystack refund failed with message: %s', 'charitable-paystack' ),
+						$response_data->message
+					)
+				);
+
+				return false;
+			}
+
+			/* Finally, mark the donation as refunded. */
+			update_post_meta( $donation_id, '_paystack_refunded', true );
+
+			$donation->log()->add( __( 'Refunded automatically from dashboard', 'charitable-paystack' ) );
+
+			return true;
+		}
+
+		/**
+		 * Checks whether a subscription can be cancelled.
+		 *
+		 * @since  1.0.0
+		 *
+		 * @param  boolean                       $can_cancel Whether the subscription can be cancelled.
+		 * @param  Charitable_Recurring_Donation $donation   The donation object.
+		 * @return boolean
+		 */
+		public function is_subscription_cancellable( $can_cancel, \Charitable_Recurring_Donation $donation ) {
+			if ( ! $can_cancel ) {
+				return $can_cancel;
+			}
+
+			return $this->api( $donation->get_test_mode( false ) )->has_valid_api_key()
+				&& ! empty( $donation->get_gateway_subscription_id() )
+				&& ! get_post_meta( $donation->ID, '_paystack_cancelled', true );
+		}
+
+		/**
+		 * Cancel a recurring donation.
+		 *
+		 * @since  1.0.0
+		 *
+		 * @param  boolean                       $cancelled Whether the subscription was cancelled successfully in the gateway.
+		 * @param  Charitable_Recurring_Donation $donation The donation object.
+		 * @return boolean
+		 */
+		public function cancel_subscription( $cancelled, \Charitable_Recurring_Donation $donation ) {
+			$subscription_id = $donation->get_gateway_subscription_id();
+
+			if ( ! $subscription_id ) {
+				return false;
+			}
+
+			$token = $this->get_email_token( $donation, $subscription_id );
+
+			if ( ! $token ) {
+				return false;
+			}
+
+			/* Disable the subscription. */
+			$response_data = $this->api( $donation->get_test_mode( false ) )->post(
+				'subscription/disable',
+				array(
+					'code'  => $subscription_id,
+					'token' => $token,
+				)
+			);
+
+			/* Check for an error. */
+			if ( false === $response_data ) {
+				$response = $this->api()->get_last_response();
+				$error    = is_wp_error() ? $response->get_error_message() : json_decode( wp_remote_retrieve_body( $response ) )->message;
+				$donation->log()->add(
+					sprintf(
+						__( 'Paystack subscription cancellation failed with message: %s', 'charitable-paystack' ),
+						$error
+					)
+				);
+
+				return false;
+			}
+
+			/* Double-check the response status. */
+			if ( ! $response_data->status ) {
+				$donation->log()->add(
+					sprintf(
+						__( 'Paystack subscription cancellation failed with message: %s', 'charitable-paystack' ),
+						$response_data->message
+					)
+				);
+
+				return false;
+			}
+
+			update_post_meta( $donation->ID, '_paystack_cancelled', true );
+
+			return true;
+		}
+
+		/**
+		 * Get the email token for a recurring donation.
+		 *
+		 * @since  1.0.0
+		 *
+		 * @param  Charitable_Recurring_Donation $donation        The donation object.
+		 * @param  string                        $subscription_id The Paystack subscription ID.
+		 * @return string|false
+		 */
+		public function get_email_token( \Charitable_Recurring_Donation $donation, $subscription_id ) {
+			$token = get_post_meta( $donation->ID, '_charitable_paystack_email_token', true );
+
+			if ( ! $token ) {
+				$subscription = $this->api( $donation->get_test_mode( false ) )->get( 'subscription/' . $subscription_id );
+
+				if ( ! $subscription || ! $subscription->status ) {
+					return false;
+				}
+
+				$token = $subscription->data->email_token;
+
+				update_post_meta( $donation->ID, '_charitable_paystack_email_token', $token );
+			}
+
+			return $token;
+		}
 
 		/**
 		 * Disable unavailable recurring donation periods on the front-end.

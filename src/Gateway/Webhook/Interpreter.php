@@ -444,6 +444,24 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		}
 
 		/**
+		 * Get the subscription's email token.
+		 *
+		 * @since  1.0.0
+		 *
+		 * @return string
+		 */
+		public function get_email_token() {
+			switch ( $this->event ) {
+				case 'invoice.create':
+					return $this->data->subscription->email_token ?? false;
+
+				case 'subscription.create':
+				case 'subscription.disable':
+					return $this->data->email_token ?? false;
+			}
+		}
+
+		/**
 		 * Return the Subscription status based on the webhook event.
 		 *
 		 * @since  1.0.0
