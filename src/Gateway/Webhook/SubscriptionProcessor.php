@@ -78,6 +78,23 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Processor' ) ) :
 
 			return true;
 		}
+
+		/**
+		 * Save the gateway subscription ID and URL if available, as well as the email token.
+		 *
+		 * @since  1.0.0
+		 *
+		 * @return void
+		 */
+		public function save_gateway_subscription_data() {
+			$this->recurring_donation->set_gateway_subscription_id( $this->interpreter->get_gateway_subscription_id() );
+
+			/** @todo Replace with call to $this->donation->set_gateway_subscription_url() once it's in core */
+			\Charitable\Packages\Webhooks\set_gateway_subscription_url( $this->interpreter->get_gateway_subscription_url(), $this->recurring_donation );
+
+			/* Save the email token as well. */
+			update_post_meta( $this->recurring_donation->ID, '_charitable_paystack_email_token', $this->interpreter->get_email_token() );
+		}
 	}
 
 endif;
