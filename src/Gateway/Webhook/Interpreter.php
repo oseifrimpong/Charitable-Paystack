@@ -175,6 +175,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 
 				case 'subscription.create':
 				case 'invoice.create':
+				case 'subscription.disable':
 					return 'subscription';
 			}
 		}
@@ -221,6 +222,9 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 */
 		public function get_event_type() {
 			switch ( $this->event ) {
+				case 'subscription.disable':
+					return 'cancellation';
+
 				case 'subscription.create':
 					return 'first_payment';
 
@@ -389,8 +393,6 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return false|object
 		 */
 		public function verify_invoice_transaction() {
-			error_log( var_export( __METHOD__, true ) );
-			error_log( $this->data->transaction->reference );
 			if ( ! isset( $this->data->transaction->reference ) ) {
 				return false;
 			}
@@ -416,7 +418,14 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 		 * @return mixed|false
 		 */
 		public function get_gateway_subscription_id() {
-			return $this->subscription->subscription_code ?? false;
+			switch ( $this->event ) {
+				case 'invoice.create':
+					return $this->data->subscription->subscription_code ?? false;
+
+				case 'subscription.create':
+				case 'subscription.disable':
+					return $this->data->subscription_code ?? false;
+			}
 		}
 
 		/**
@@ -515,8 +524,6 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Interpreter' ) ) 
 			/* If this is an invoice.create event, verify the transaction. */
 			if ( 'invoice.create' === $this->event ) {
 				$this->transaction = $this->verify_invoice_transaction();
-				error_log( var_export( __METHOD__, true ) );
-				error_log( var_export( $this->transaction, true ) );
 
 				if ( ! $this->transaction ) {
 					$this->set_invalid_request( __( 'Unable to verify transaction, or transaction has already been processed', 'charitable-paystack' ) );

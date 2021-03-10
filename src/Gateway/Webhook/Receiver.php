@@ -63,9 +63,9 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Webhook\Receiver' ) ) :
 
 				if ( 'subscription' === $interpreter->get_event_subject() ) {
 					$this->processor = new SubscriptionProcessor( $interpreter );
+				} else {
+					$this->processor = new DonationProcessor( $interpreter );
 				}
-
-				$this->processor = new DonationProcessor( $interpreter );
 			}
 
 			return $this->processor;

@@ -106,6 +106,10 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Request' ) ) :
 			if ( $recurring_donation ) {
 				$plan = Plan::init_with_recurring_donation( $recurring_donation );
 
+				if ( is_null( $plan->plan_code ) ) {
+					return false;
+				}
+
 				$this->request_data['plan'] = $plan->plan_code;
 			}
 

@@ -6,7 +6,7 @@
  * @copyright Copyright (c) 2021, Studio 164a
  * @license   http://opensource.org/licenses/gpl-2.0.php GNU Public License
  * @since     1.0.0
- * @version   1.0.1
+ * @version   1.0.0
  */
 
 namespace Charitable\Pro\Paystack\Gateway;
@@ -111,6 +111,10 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Gateway' ) ) :
 
 			/* Register the Paystack payment processor */
 			PaymentProcessors::register( self::ID, '\Charitable\Pro\Paystack\Gateway\Payment\Processor' );
+
+			/* Disable unavailable plan periods on the front-end. Super hacky! */
+			add_filter( 'charitable_recurring_periods_adverbs', array( $this, 'disable_unavailable_recurring_donation_periods' ) );
+			add_filter( 'charitable_recurring_periods', array( $this, 'disable_unavailable_recurring_donation_periods' ) );
 		}
 
 		/**
@@ -395,6 +399,28 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Gateway' ) ) :
 			/* Stop infinite recursion. */
 			remove_action( 'charitable_process_ipn_' . self::ID, array( $this, 'process_webhook' ) );
 			\Charitable\Packages\Webhooks\handle( self::ID );
+		}
+
+
+		/**
+		 * Disable unavailable recurring donation periods on the front-end.
+		 *
+		 * @since  1.0.0
+		 *
+		 * @param  array $periods The list of periods.
+		 * @return array
+		 */
+		public function disable_unavailable_recurring_donation_periods( $periods ) {
+			if ( ! charitable()->registry()->get( 'gateways' )->is_active_gateway( self::ID ) ) {
+				return $periods;
+			}
+
+			/* Get rid of weekly since that is not possible with Paystack. */
+			if ( isset( $periods['quarter'] ) ) {
+				unset( $periods['quarter'] );
+			}
+
+			return $periods;
 		}
 
 		/**

@@ -199,6 +199,12 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Plan' ) ) :
 				return false;
 			}
 
+			$interval = $this->get_plan_interval();
+
+			if ( ! $interval ) {
+				return false;
+			}
+
 			/**
 			 * Filter the plan arguments.
 			 *
@@ -215,7 +221,7 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Plan' ) ) :
 					'name'          => $this->get_plan_name(),
 					'amount'        => $this->args['amount'],
 					'description'   => 'Plan Description',
-					'interval'      => $this->get_plan_interval(),
+					'interval'      => $interval,
 					'currency'      => charitable_get_currency(),
 					'send_invoices' => charitable_get_option( array( 'charitable_paystack', 'send_invoices' ), false ),
 					'send_sms'      => charitable_get_option( array( 'charitable_paystack', 'send_sms' ), false ),
@@ -321,6 +327,16 @@ if ( ! class_exists( '\Charitable\Pro\Paystack\Gateway\Payment\Plan' ) ) :
 				case 'annual':
 					return 'annually';
 			}
+
+			charitable_get_notices()->add_error(
+				sprintf(
+					/* Translators: %s: error message */
+					__( 'Paystack does not currently support %s recurring donations.', 'charitable-paystack') ,
+					charitable_recurring_get_donation_period_adverb( $this->args['period'] )
+				)
+			);
+
+			return false;
 		}
 	}
 

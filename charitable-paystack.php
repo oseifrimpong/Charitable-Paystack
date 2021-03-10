@@ -42,8 +42,6 @@ add_action(
 		if ( $activation->ok() ) {
 			spl_autoload_register( '\Charitable\Pro\Paystack\autoloader' );
 
-			require_once( 'includes/class-charitable-paystack.php' );
-
 			return new Paystack( __FILE__ );
 		}
 
